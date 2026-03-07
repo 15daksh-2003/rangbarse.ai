@@ -1,0 +1,9 @@
+torch
+diffusers
+transformers
+accelerate
+fastapi
+uvicorn[standard]
+pillow
+xformers
+peft

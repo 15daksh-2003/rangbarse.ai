@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RangBarse.ai — Virtual Holi Experience</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- LANDING SCREEN -->
+  <div id="landing-screen" class="screen active">
+    <div class="landing-content">
+      <h1 class="logo">Rang<span class="logo-accent">Barse</span>.ai</h1>
+      <p class="tagline">Your Virtual Holi Experience</p>
+      <p class="subtitle">Dodge balloons, throw colors, get messy — then let AI turn you into art!</p>
+      <button id="btn-start" class="btn-primary">Allow Camera & Play 🎨</button>
+    </div>
+  </div>
+
+  <!-- GPU STATUS BADGE (shown on all screens) -->
+  <div id="gpu-status" class="gpu-status">
+    <span id="gpu-dot" class="gpu-dot offline"></span>
+    <span id="gpu-label">AI-Lite</span>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- GAME CONTAINER -->
+  <div id="game-container" class="screen hidden">
+    <div id="canvas-stack"></div>
+    <div id="hud-overlay">
+      <div id="timer-display" class="hud-item">30</div>
+      <div id="score-display" class="hud-item">Score: 0</div>
+    </div>
+    <button id="btn-play" class="btn-primary btn-center">Start Holi! 💦</button>
+    <div id="snapshot-bar" class="snapshot-bar hidden">
+      <button id="btn-snapshot" class="btn-snapshot" title="Take a moment 📸">📸</button>
+      <span id="snapshot-count" class="snapshot-count">3 left</span>
+    </div>
+    <div id="event-text" class="event-text hidden"></div>
+  </div>
+
+  <!-- GAME RULES (shown before game starts) -->
+  <div id="rules-overlay" class="overlay hidden">
+    <div class="overlay-content rules-content">
+      <h2>How to Play 🎮</h2>
+      <div class="rules-grid">
+        <div class="rule-item">
+          <span class="rule-icon">🏃</span>
+          <div>
+            <strong>Dodge</strong>
+            <p>Move your body to avoid balloons</p>
+          </div>
+        </div>
+        <div class="rule-item">
+          <span class="rule-icon">✋</span>
+          <div>
+            <strong>Catch</strong>
+            <p>Open your palm near a balloon</p>
+          </div>
+        </div>
+        <div class="rule-item">
+          <span class="rule-icon">💨</span>
+          <div>
+            <strong>Throw</strong>
+            <p>Flick your hand to throw it back</p>
+          </div>
+        </div>
+        <div class="rule-item">
+          <span class="rule-icon">💥</span>
+          <div>
+            <strong>Get Colorful!</strong>
+            <p>Hits leave gulal splatters on screen</p>
+          </div>
+        </div>
+      </div>
+      <div class="rules-scoring">
+        <h3>Scoring</h3>
+        <div class="score-rules">
+          <span>🏃 Dodge = <strong>+10</strong></span>
+          <span>✋💨 Catch & Throw = <strong>+25</strong></span>
+          <span>📸 3 mid-game snapshots allowed</span>
+        </div>
+      </div>
+      <p class="rules-tip">💡 Colors get wilder as the game progresses!</p>
+      <button id="btn-start-game" class="btn-primary">Let's Go! 💦</button>
+    </div>
+  </div>
+
+  <!-- CAPTURE OVERLAY -->
+  <div id="capture-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h2>🎉 Time's Up!</h2>
+      <p class="capture-prompt">Yell <strong>"Holi Hai!"</strong> or click below</p>
+      <button id="btn-capture" class="btn-primary">Capture My Masterpiece 📸</button>
+      <div id="voice-indicator" class="voice-indicator hidden">
+        <span class="voice-dot"></span> Listening...
+      </div>
+    </div>
+  </div>
+
+  <!-- PHOTO PICKER (shown if mid-game snapshots exist) -->
+  <div id="photo-picker" class="overlay hidden">
+    <div class="overlay-content">
+      <h2>Pick Your Best Moment 📸</h2>
+      <p class="picker-subtitle">Tap the photo you want AI to transform</p>
+      <div id="photo-grid" class="photo-grid"></div>
+    </div>
+  </div>
+
+  <!-- STYLE PICKER -->
+  <div id="style-picker" class="overlay hidden">
+    <div class="overlay-content">
+      <h2>Choose Your Art Style</h2>
+      <div class="style-options">
+        <button class="style-card" data-style="watercolor">
+          <span class="style-icon">🎨</span>
+          <span class="style-name">Watercolor Holi</span>
+          <span class="style-desc">Dreamy, soft watercolor painting</span>
+        </button>
+        <button class="style-card" data-style="bollywood">
+          <span class="style-icon">🎬</span>
+          <span class="style-name">Bollywood Poster</span>
+          <span class="style-desc">Cinematic, dramatic lighting</span>
+        </button>
+        <button class="style-card" data-style="rangoli">
+          <span class="style-icon">🖼️</span>
+          <span class="style-name">Rangoli Art</span>
+          <span class="style-desc">Geometric rangoli patterns</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING / ENGAGEMENT SCREEN -->
+  <div id="loading-screen" class="overlay hidden">
+    <div class="overlay-content loading-content">
+      <div class="loading-spinner">
+        <div class="spinner-dot" style="--color: #FF00FF"></div>
+        <div class="spinner-dot" style="--color: #00FFFF"></div>
+        <div class="spinner-dot" style="--color: #FFFF00"></div>
+        <div class="spinner-dot" style="--color: #FF6600"></div>
+      </div>
+      <p class="loading-text">Creating your masterpiece...</p>
+
+      <!-- Animated Score Reveal -->
+      <div id="score-reveal" class="score-reveal">
+        <div class="reveal-item" id="reveal-dodged">
+          <span class="reveal-icon">🏃</span>
+          <span class="reveal-label">Dodged</span>
+          <span class="reveal-value" data-target="0">0</span>
+        </div>
+        <div class="reveal-item" id="reveal-hit">
+          <span class="reveal-icon">💥</span>
+          <span class="reveal-label">Hit</span>
+          <span class="reveal-value" data-target="0">0</span>
+        </div>
+        <div class="reveal-item" id="reveal-thrown">
+          <span class="reveal-icon">💨</span>
+          <span class="reveal-label">Thrown</span>
+          <span class="reveal-value" data-target="0">0</span>
+        </div>
+        <div class="reveal-item" id="reveal-coverage">
+          <span class="reveal-icon">🎨</span>
+          <span class="reveal-label">Coverage</span>
+          <span class="reveal-value" data-target="0">0%</span>
+        </div>
+      </div>
+
+      <!-- Holi Personality Badge -->
+      <div id="holi-personality" class="holi-personality hidden">
+        <span id="personality-emoji" class="personality-emoji"></span>
+        <span id="personality-title" class="personality-title"></span>
+      </div>
+
+      <!-- Fun Facts Carousel -->
+      <div id="fun-facts" class="fun-facts">
+        <p id="fun-fact-text" class="fun-fact-text"></p>
+      </div>
+
+      <!-- Ready Prompt (appears when AI result arrives) -->
+      <div id="art-ready-prompt" class="art-ready-prompt hidden">
+        <div class="ready-sparkle">✨</div>
+        <p class="ready-text">Your Holi Card is ready!</p>
+        <button id="btn-view-result" class="btn-primary btn-glow">View My Masterpiece 🎨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="result-screen" class="screen hidden">
+    <div class="result-content">
+      <h2>Your Holi Masterpiece 🎨</h2>
+      <div id="result-images">
+        <div class="result-panel">
+          <span class="result-label">Before</span>
+          <img id="result-original" alt="Original" />
+        </div>
+        <div class="result-panel">
+          <span class="result-label">AI Art</span>
+          <img id="result-ai" alt="AI Art" />
+        </div>
+      </div>
+      <div id="stats-display" class="stats-bar"></div>
+      <div class="result-actions">
+        <button id="btn-download" class="btn-primary">Download Holi Card 📥</button>
+        <button id="btn-play-again" class="btn-secondary">Play Again 🔄</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+# Load test configuration for RangBarse.ai
+# Tool: Artillery (https://www.artillery.io/)
+#
+# Install: npm install -g artillery
+#
+# Run locally:
+#   artillery run scripts/loadtest/loadtest.yml
+#
+# Run against public URL (Cloudflare tunnel):
+#   artillery run scripts/loadtest/loadtest.yml --target https://your-tunnel.trycloudflare.com
+#
+# Save report:
+#   artillery run scripts/loadtest/loadtest.yml -o scripts/loadtest/results/report.json
+#
+# Rate limiting + concurrency applies to ALL access (localhost AND tunnel)
+# because all requests pass through the Node proxy on port 3001.
+#
+# Use results to tune server.config.json:
+# - If p95 > 10s: reduce maxRequests or maxQueueLength
+# - If errors > 5%: increase rate limit window or reduce arrivalRate
+# - Check GPU memory during test: nvidia-smi
+
+config:
+  target: "http://localhost:3001"
+  phases:
+    - name: "Warm up"
+      duration: 10
+      arrivalRate: 1
+    - name: "Sustained load"
+      duration: 30
+      arrivalRate: 2
+    - name: "Spike"
+      duration: 10
+      arrivalRate: 5
+  payload:
+    path: "test-payload.json"
+    fields:
+      - "image"
+      - "style"
+
+scenarios:
+  - name: "Health check"
+    weight: 70
+    flow:
+      - get:
+          url: "/api/health"
+
+  - name: "AI Generation (with payload)"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/generate"
+          headers:
+            Content-Type: "application/json"
+          json:
+            image: "{{ image }}"
+            style: "{{ style }}"

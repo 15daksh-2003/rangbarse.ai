@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+
+# Test output & coverage
+client/coverage/
+test-results/
+playwright-report/
+.vitest/
+
+# Logs (session logs auto-managed by server)
+*.log
+
+# OS
+.DS_Store
+
+# Design docs (internal architecture — not exposed to external devs)
+docs/
+
+# Python
+server/venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Server runtime
+server/logs/
+server/test-results/
+
+# Machine-specific config (copy from server.config.example.json)
+server/server.config.json
+server.config.json
+
+# Load test results
+scripts/loadtest/results/

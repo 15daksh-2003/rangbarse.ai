@@ -1,0 +1,22 @@
+title = "RangBarse.ai Gitleaks Config"
+
+[extend]
+# Use default gitleaks rules
+useDefault = true
+
+[allowlist]
+description = "Project-specific allowlist"
+paths = [
+    '''node_modules/''',
+    '''server/venv/''',
+    '''client/coverage/''',
+    '''client/dist/''',
+    '''package-lock\.json''',
+    '''\.pytest_cache/''',
+]
+
+# Allow example/placeholder tokens in docs and config templates
+regexes = [
+    '''hf_your_token_here''',
+    '''your-username''',
+]

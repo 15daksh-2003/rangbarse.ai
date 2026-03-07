@@ -1,0 +1,39 @@
+{
+  "name": "rangbarse.ai",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Virtual Holi Experience - Webcam-based motion game with AI art generation",
+  "scripts": {
+    "dev": "node scripts/devServer.js --with-vite",
+    "dev:client": "vite --config client/vite.config.js",
+    "dev:api": "node scripts/devServer.js",
+    "build": "vite build --config client/vite.config.js",
+    "preview": "vite preview --config client/vite.config.js",
+    "test": "vitest run --config client/vite.config.js",
+    "test:watch": "vitest --config client/vite.config.js",
+    "test:e2e": "playwright test",
+    "test:backend": "cd server && python -m pytest tests/ -v",
+    "test:quality": "cd server && python scripts/run_quality_tests.py",
+    "test:all": "vitest run --config client/vite.config.js && playwright test && cd server && python -m pytest tests/ -v",
+    "scan:secrets": "gitleaks detect --config .gitleaks.toml --source . -v"
+  },
+  "keywords": [
+    "holi",
+    "webcam",
+    "mediapipe",
+    "ai",
+    "game"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "vite": "^7.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@vitest/coverage-v8": "^4.0.18",
+    "vitest": "^4.0.18"
+  }
+}
