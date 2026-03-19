@@ -19,7 +19,7 @@ try {
   config = { rateLimit: { windowMs: 60000, maxRequests: 15 }, concurrency: { maxConcurrentInference: 1, maxQueueLength: 5 }, inference: { url: 'http://localhost:8000' } };
 }
 
-const PYTHON_SERVER = config.inference?.url || 'http://localhost:8000';
+const PYTHON_SERVER = process.env.INFERENCE_URL || config.inference?.url || 'http://localhost:8000';
 
 // --- Concurrency Gate ---
 class ConcurrencyGate {

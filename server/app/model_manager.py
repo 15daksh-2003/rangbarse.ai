@@ -22,14 +22,31 @@ class ModelManager:
         """Load SD 1.5 pipeline and warm up GPU."""
         import torch
         from diffusers import AutoPipelineForImage2Image, DPMSolverMultistepScheduler
+        from huggingface_hub import scan_cache_dir
+
+        model_id = "stable-diffusion-v1-5/stable-diffusion-v1-5"
+
+        # Check if model is already cached
+        try:
+            cache_info = scan_cache_dir()
+            cached = any(r.repo_id == model_id for r in cache_info.repos)
+        except Exception:
+            cached = False
+
+        if cached:
+            logger.info("Model found in cache. Loading from disk...")
+        else:
+            logger.info("Model NOT cached. Downloading ~5GB from HuggingFace (this may take several minutes)...")
 
         logger.info("Loading SD 1.5 pipeline (canvas-only mode)...")
 
         self.pipe = AutoPipelineForImage2Image.from_pretrained(
-            "stable-diffusion-v1-5/stable-diffusion-v1-5",
+            model_id,
             torch_dtype=torch.float16,
             safety_checker=None,
         )
+
+        logger.info("Model downloaded and loaded successfully.")
 
         self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(
             self.pipe.scheduler.config

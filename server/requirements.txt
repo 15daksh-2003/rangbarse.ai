@@ -1,9 +1,15 @@
-torch
-diffusers
-transformers
-accelerate
-fastapi
-uvicorn[standard]
-pillow
-xformers
-peft
+# Core ML (torch installed separately with CUDA index URL — see Dockerfile.gpu / README)
+# torch  — installed via: pip install torch torchvision --index-url .../cu124
+diffusers==0.31.0
+transformers==4.44.2
+accelerate==0.34.2
+peft==0.13.2
+
+# Server
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pillow>=10.0.0
+
+# Optional: xformers for memory-efficient attention (skip if version conflicts)
+# Falls back to attention slicing automatically if not installed.
+# xformers

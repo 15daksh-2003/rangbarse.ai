@@ -1,0 +1,14 @@
+node_modules/
+.git/
+client/coverage/
+client/dist/
+server/__pycache__/
+server/.pytest_cache/
+server/logs/
+server/test-results/
+server/quality/__pycache__/
+test-results/
+*.pyc
+.env
+.pytest_cache/
+.vite/

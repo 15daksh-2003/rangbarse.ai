@@ -465,6 +465,297 @@ For a custom domain, set up a named tunnel in the Cloudflare dashboard.
 
 ---
 
+## Docker Setup (Alternative)
+
+Docker provides a one-command setup that eliminates CUDA/PyTorch/Python
+version management. The dev workflow (`npm run dev`) still works as before —
+Docker is an alternative for reproducible deployments.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (with Docker Compose v2)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+  (for GPU inference)
+- NVIDIA GPU with 4+ GB VRAM
+
+**Verify GPU is accessible from Docker:**
+```bash
+docker run --rm --runtime=nvidia --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+### Quick Start
+
+```bash
+# Clone and start everything
+git clone https://github.com/your-username/rangbarse.ai.git
+cd rangbarse.ai
+
+# First run: use foreground mode to see model download progress (~5GB)
+docker compose up --build
+
+# Subsequent runs: start in background (model already cached)
+docker compose up -d
+
+# Open http://localhost in your browser
+```
+
+> **First run note:** The GPU container downloads the SD 1.5 model (~5GB)
+> on first start. Run in foreground (`docker compose up`, without `-d`)
+> to see download progress in real time. Subsequent starts are instant.
+
+### With Cloudflare Tunnel (Public Access)
+
+```bash
+# Start app + tunnel (gives you a public https://...trycloudflare.com URL)
+docker compose --profile tunnel up --build
+```
+
+### Container Lifecycle
+
+```bash
+# --- Starting ---
+
+# First run: foreground mode to see model download progress (~5GB)
+docker compose up --build
+
+# Subsequent runs: background (model cached, instant start)
+docker compose up -d --build
+
+# Start with Cloudflare tunnel
+docker compose --profile tunnel up -d --build
+
+# Monitor model download on first run (if started in background)
+docker compose logs -f python-gpu
+
+# --- Monitoring ---
+
+# Follow all logs (color-coded by service)
+docker compose logs -f
+
+# Follow a specific service
+docker compose logs -f python-gpu
+
+# Check container health status
+docker compose ps
+
+# GPU status from inside container
+docker exec rangbarse-python-gpu nvidia-smi
+
+# API health check
+curl http://localhost/api/health
+
+# --- Stopping ---
+
+# Stop all services (keeps images, volumes, and cached model)
+docker compose down
+
+# Stop including tunnel profile
+docker compose --profile tunnel down
+
+# --- Cleanup ---
+
+# Remove containers + named volumes (re-downloads ~5GB model next start)
+docker compose down -v
+
+# Remove built images (forces full rebuild next start)
+docker compose down --rmi local
+
+# Full cleanup: containers + volumes + images + orphans
+docker compose down -v --rmi local --remove-orphans
+
+# Remove only dangling/unused Docker build cache
+docker builder prune
+```
+
+### Debugging in Docker
+
+| What | Command |
+|------|---------|
+| All logs (live) | `docker compose logs -f` |
+| GPU server logs | `docker compose logs -f python-gpu` |
+| Node proxy logs | `docker compose logs -f node-proxy` |
+| nginx access logs | `docker compose logs -f nginx` |
+| Trace a request ID | `docker compose logs \| grep "request-id"` |
+| GPU memory | `docker exec rangbarse-python-gpu nvidia-smi` |
+| Session log files | `ls server/logs/session_*.log` (volume-mounted) |
+| Container health | `docker compose ps` |
+| API health check | `curl http://localhost/api/health` |
+
+### Load Testing (Docker)
+
+Same Artillery config, different target:
+
+```bash
+# Against Docker nginx (port 80)
+artillery run scripts/loadtest/loadtest.yml --target http://localhost
+
+# Against Cloudflare tunnel
+artillery run scripts/loadtest/loadtest.yml --target https://your.trycloudflare.com
+```
+
+### Architecture
+
+```
+http://localhost:80 (nginx)
+  ├── / → Static files (Vite build output)
+  └── /api/* → node-proxy:3001
+                  ├── Rate limiting (15 req/60s)
+                  ├── Concurrency gate (1 active + 5 queue)
+                  └── → python-gpu:8000 (SD 1.5 inference)
+
+Optional: cloudflared → nginx:80 (Cloudflare tunnel sidecar)
+```
+
+All services communicate via Docker internal network. Only port 80 is
+exposed to the host.
+
+### Model Cache
+
+The SD 1.5 model (~5GB) is **not baked into the Docker image**. It's
+downloaded on first run and stored in a Docker named volume (`huggingface-cache`).
+
+**Default: Named Docker volume** (clean isolation, recommended for fresh setups)
+```bash
+# Model downloads into the named volume on first start (~5GB, takes a few minutes)
+docker compose up --build
+
+# Volume persists across container restarts
+docker compose down && docker compose up     # instant start, model cached
+
+# WARNING: this deletes the volume and requires re-downloading the model
+docker compose down -v
+```
+
+**Opt-in: Host bind mount** (reuse existing cache from bare-metal setup)
+```bash
+# If you've already run the server bare-metal, reuse the host cache:
+HF_CACHE_DIR=~/.cache/huggingface docker compose up
+
+# Or a custom path:
+HF_CACHE_DIR=/fast-ssd/hf-cache docker compose up
+```
+
+To use host bind mount permanently, edit `docker-compose.yml`:
+```yaml
+# Replace:
+  - huggingface-cache:/root/.cache/huggingface
+# With:
+  - ~/.cache/huggingface:/root/.cache/huggingface
+```
+
+**When to use which:**
+
+| Scenario | Recommended | Why |
+|----------|-------------|-----|
+| Fresh setup, no prior ML work | Named volume (default) | Clean isolation, no host path assumptions |
+| Already have cached models from bare-metal | Host bind mount | Skip ~5GB download |
+| Multiple projects sharing models | Host bind mount | Shared cache saves disk |
+| CI/CD or disposable environments | Named volume | Self-contained, no host deps |
+
+### Troubleshooting Docker Setup
+
+<details>
+<summary><strong>GPU not accessible from Docker</strong></summary>
+
+**Symptom:** `docker compose up` fails with `could not select device driver "" with capabilities: [[gpu]]`
+
+**Fix:** Install the NVIDIA Container Toolkit:
+
+```bash
+# Add NVIDIA apt repo
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+# Install and configure
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+
+# Verify
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+</details>
+
+<details>
+<summary><strong>nvidia-smi not found (WSL2)</strong></summary>
+
+On WSL2, `nvidia-smi` is at `/usr/lib/wsl/lib/nvidia-smi`, not on `$PATH`.
+The GPU driver comes from the **Windows host** — do NOT install Linux NVIDIA
+drivers inside WSL2. Docker GPU passthrough works via the Windows driver.
+
+```bash
+/usr/lib/wsl/lib/nvidia-smi    # Run this instead
+```
+
+</details>
+
+<details>
+<summary><strong>GPU container unhealthy / model download slow</strong></summary>
+
+**Symptom:** `dependency failed to start: container rangbarse-python-gpu is unhealthy`
+
+The SD 1.5 model (~5GB) downloads on first run. The health check has a 600s
+(10 min) start period, but slow connections may exceed this.
+
+**Options:**
+1. **Increase the health check start period** in `docker-compose.yml`:
+   ```yaml
+   start_period: 1200s   # 20 minutes
+   ```
+2. **Use host bind mount** to reuse a pre-cached model:
+   ```bash
+   HF_CACHE_DIR=~/.cache/huggingface docker compose up
+   ```
+3. **Pre-download the model** bare-metal, then bind-mount:
+   ```bash
+   pip install diffusers transformers
+   python -c "from diffusers import AutoPipelineForImage2Image; AutoPipelineForImage2Image.from_pretrained('stable-diffusion-v1-5/stable-diffusion-v1-5')"
+   HF_CACHE_DIR=~/.cache/huggingface docker compose up
+   ```
+
+</details>
+
+<details>
+<summary><strong>Python package version conflicts in GPU container</strong></summary>
+
+**Background:** Versions in `server/requirements.txt` are pinned for
+compatibility. If you need to update packages, test these constraints:
+
+- `diffusers`, `transformers`, `peft`, and `accelerate` must be version-compatible
+- `torch` and `torchvision` must match (installed together via `--index-url`)
+- `xformers` is excluded — it tends to pull incompatible torch versions.
+  The server falls back to attention slicing automatically.
+
+**If you see import errors after changing versions:**
+```bash
+# Test imports inside the container:
+docker run --rm --gpus all rangbarseai-python-gpu python3 -c "
+import torch; print('torch', torch.__version__, 'CUDA:', torch.cuda.is_available())
+from diffusers import AutoPipelineForImage2Image; print('diffusers OK')
+from transformers import PreTrainedModel; print('transformers OK')
+"
+```
+
+</details>
+
+<details>
+<summary><strong>Hash mismatch errors during docker build</strong></summary>
+
+**Symptom:** `THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE`
+
+This is a transient PyPI CDN issue. Simply retry the build:
+```bash
+docker compose build python-gpu --no-cache
+```
+
+</details>
+
+---
+
 ## Project Structure
 
 ```
@@ -490,6 +781,13 @@ rangbarse.ai/
 │   ├── devServer.js           # Node.js API proxy (rate limit + concurrency)
 │   ├── generateAssets.js      # Procedural audio + SVG generation
 │   └── loadtest/              # Load testing configs (Artillery)
+├── nginx/
+│   └── nginx.conf             # Production reverse proxy config
+├── Dockerfile.frontend        # Multi-stage: Vite build → nginx
+├── Dockerfile.proxy           # Node.js Express proxy container
+├── Dockerfile.gpu             # Python FastAPI + CUDA container
+├── docker-compose.yml         # Production orchestration (4 services)
+├── .dockerignore              # Build context exclusions
 ├── server.config.example.json # Machine-specific config template
 └── README.md
 ```

@@ -1,0 +1,70 @@
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rangbarse-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      node-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+
+  node-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    container_name: rangbarse-node-proxy
+    environment:
+      INFERENCE_URL: http://python-gpu:8000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      python-gpu:
+        condition: service_healthy
+    restart: unless-stopped
+
+  python-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: rangbarse-python-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+      - ./server/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 600s
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: rangbarse-cloudflared
+    command: tunnel --url http://nginx:80
+    depends_on:
+      - nginx
+    profiles:
+      - tunnel
+    restart: unless-stopped
+
+volumes:
+  huggingface-cache:
+
+networks:
+  default:
+    name: rangbarse-net

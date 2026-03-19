@@ -1,0 +1,39 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Force HuggingFace download progress bars in Docker logs (no TTY)
+ENV HF_HUB_ENABLE_HF_TRANSFER=0
+ENV HF_HUB_DISABLE_PROGRESS_BARS=0
+ENV PYTHONUNBUFFERED=1
+
+# Install Python 3.11
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    curl \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies (versions pinned in requirements.txt)
+COPY server/requirements.txt ./
+RUN pip install --no-cache-dir \
+    torch torchvision --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy server application code
+COPY server/app/ ./app/
+COPY server/__init__.py ./
+
+# Model cache — named Docker volume by default, host bind mount opt-in
+VOLUME /root/.cache/huggingface
+
+# Logs directory (volume-mounted in docker-compose)
+RUN mkdir -p /app/logs
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8000"]
