@@ -754,6 +754,119 @@ docker compose build python-gpu --no-cache
 
 </details>
 
+### Publishing Docker Images to Docker Hub
+
+A GitHub Actions workflow (`.github/workflows/docker-publish.yml`) builds and
+pushes all 3 images to Docker Hub automatically.
+
+#### Setup (one-time)
+
+**1. Create Docker Hub repositories:**
+
+Go to [hub.docker.com](https://hub.docker.com) → Create Repository for each:
+- `rangbarse/frontend` — nginx + built frontend (~30MB)
+- `rangbarse/proxy` — Node.js Express proxy (~150MB)
+- `rangbarse/gpu` — Python + CUDA + PyTorch (~4GB, model not included)
+
+> Replace `rangbarse` with your Docker Hub username or organization.
+> If you change it, update `IMAGE_PREFIX` in the workflow file.
+
+**2. Add GitHub repository secrets:**
+
+Go to your GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+
+| Secret | Value |
+|--------|-------|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token (create at hub.docker.com → Account Settings → Security → New Access Token) |
+
+#### When it runs
+
+| Trigger | What happens |
+|---------|-------------|
+| Push to `main` | Builds + pushes all 3 images tagged `main` |
+| Push a version tag (`v1.0.0`) | Builds + pushes tagged `1.0.0` |
+| Pull request | Builds only (no push) — validates Dockerfiles |
+| Manual dispatch | Trigger from GitHub Actions tab → "Run workflow" |
+
+#### Image tags
+
+Each build produces multiple tags automatically:
+
+```
+rangbarse/frontend:main          # branch name
+rangbarse/frontend:1.0.0         # semver (from git tag v1.0.0)
+rangbarse/frontend:a1b2c3d       # git commit SHA
+```
+
+#### Configurable parameters
+
+Edit `.github/workflows/docker-publish.yml`:
+
+| Parameter | Location | Default | Purpose |
+|-----------|----------|---------|---------|
+| `IMAGE_PREFIX` | `env.IMAGE_PREFIX` | `rangbarse` | Docker Hub namespace (your username or org) |
+| `REGISTRY` | `env.REGISTRY` | `docker.io` | Registry URL (change for GHCR, ECR, etc.) |
+| `branches` | `on.push.branches` | `[main]` | Which branches trigger builds |
+| `tags` | `on.push.tags` | `['v*']` | Which git tags trigger versioned builds |
+
+#### Using published images
+
+Other developers can skip building entirely:
+
+```bash
+# Pull pre-built images
+docker pull rangbarse/frontend:main
+docker pull rangbarse/proxy:main
+docker pull rangbarse/gpu:main
+
+# Or use a docker-compose.override.yml to reference them:
+# services:
+#   nginx:
+#     image: rangbarse/frontend:main
+#   node-proxy:
+#     image: rangbarse/proxy:main
+#   python-gpu:
+#     image: rangbarse/gpu:main
+```
+
+#### Pushing manually (without CI)
+
+```bash
+# Login to Docker Hub
+docker login
+
+# Tag and push (from a local build)
+docker tag rangbarseai-nginx rangbarse/frontend:latest
+docker tag rangbarseai-node-proxy rangbarse/proxy:latest
+docker tag rangbarseai-python-gpu rangbarse/gpu:latest
+
+docker push rangbarse/frontend:latest
+docker push rangbarse/proxy:latest
+docker push rangbarse/gpu:latest
+```
+
+#### Switching to GitHub Container Registry (GHCR)
+
+To use GHCR instead of Docker Hub, change the workflow:
+
+```yaml
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/rangbarse
+```
+
+And update the login step to use `GITHUB_TOKEN` instead:
+```yaml
+- uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
+```
+
+No Docker Hub account needed — images are stored alongside your GitHub repo.
+
 ---
 
 ## Project Structure
